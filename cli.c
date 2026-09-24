@@ -9,20 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define X(Arg)                                                                 \
-  case ACTION_##Arg:                                                           \
-    return #Arg;                                                               \
-    break;
-
-char *repr_cli_action(cli_action_t action) {
-  switch (action) { X_CLI_ACTIONS }
-
-  assert(false);
-  return "?";
-}
-
-#undef X
-
 typedef struct {
   int argc;
   char **argv;
@@ -41,16 +27,8 @@ static char *state_advance(parse_state_t *state) {
   return state->argv[state->current_arg++];
 }
 
-static char *state_peek(parse_state_t state) {
-  return state.argv[state.current_arg + 1];
-}
-
 static bool state_is_finished(parse_state_t state) {
   return state.current_arg == state.argc;
-}
-
-static bool state_is_last(parse_state_t state) {
-  return state.current_arg + 1 == state.argc;
 }
 
 typedef enum {
@@ -91,7 +69,6 @@ static uint8_t get_digits_in_number(uint64_t d) {
   char *__format = Format;                                                     \
   char *__s = S;                                                               \
   size_t __length = strlen(__format) - 2 + strlen(__s) + 1;                    \
-  /* We are not bothering with freeing this */                                 \
   char *VarName = malloc(__length);                                            \
   snprintf(VarName, __length, __format, __s);
 
@@ -101,7 +78,6 @@ static uint8_t get_digits_in_number(uint64_t d) {
   int64_t __d2 = D2;                                                           \
   size_t __length = strlen(__format) - 2 + get_digits_in_number(__d1) - 2 +    \
                     get_digits_in_number(__d2) + 1;                            \
-  /* We are not bothering with freeing this */                                 \
   char *VarName = malloc(__length);                                            \
   snprintf(VarName, __length, __format, __d1, __d2);
 
@@ -115,7 +91,7 @@ DefParseResult(parse_result_i64_t, int64_t);
 DefParseResult(parse_result_action_t, cli_action_t);
 DefParseResult(parse_result_str_t, char *);
 
-// cli_parse_effect_arg
+// cli_parse_effect
 
 #define X(Arg)                                                                 \
   if (strcasecmp(#Arg, arg) == 0) {                                            \
@@ -133,7 +109,7 @@ static parse_result_effect_t cli_parse_effect(parse_state_t state) {
 
 #undef X
 
-// cli_parse_time_arg
+// cli_parse_time
 
 static parse_result_u16_t cli_parse_time(parse_state_t state) {
   char *arg = state_advance(&state), *end;
@@ -153,7 +129,7 @@ static parse_result_u16_t cli_parse_time(parse_state_t state) {
   }
 }
 
-// cli_parse_direction_arg
+// cli_parse_direction
 
 static parse_result_u16_t cli_parse_direction(parse_state_t state) {
   char *arg = state_advance(&state), *end;
@@ -168,7 +144,7 @@ static parse_result_u16_t cli_parse_direction(parse_state_t state) {
   }
 }
 
-// cli_parse_relative_arg
+// cli_parse_relative
 
 static parse_result_i64_t cli_parse_relative(parse_state_t state,
                                              uint32_t max) {

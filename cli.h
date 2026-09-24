@@ -17,8 +17,6 @@
 typedef enum { X_CLI_ACTIONS } cli_action_t;
 #undef X
 
-char *repr_cli_action(cli_action_t action);
-
 typedef struct {
   cli_action_t action;
   uint16_t delay;
