@@ -13,6 +13,9 @@ typedef enum {
   PARSE_SCALAR_OOB = -3,
 } parse_result_t;
 
+#define X_PARSE_RESULT                                                         \
+  X(PARSE_OK) X(PARSE_INVALID_SCALAR) X(PARSE_INVALID_UNIT) X(PARSE_SCALAR_OOB)
+
 // Result in milliseconds
 parse_result_t parse_time(char *src, uint16_t *result); // ms, s, min...
 
@@ -33,5 +36,7 @@ parse_result_t parse_direction(char *src,
 // Result: 100% -> max, 0% -> 0, -100% -> -max
 parse_result_t parse_relative(char *src, uint32_t max,
                               int64_t *result); // 0.5, 50%, 1/2...
+
+char *parse_result_get_name(parse_result_t result);
 
 #endif // !_FOFEE_UNITS

@@ -4,10 +4,20 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 
-static bool is_a_number(double d) {
+static inline void gobble_whitespace(char **src) {
+  char *head = *src;
+  while (isspace(head[0])) {
+    ++head;
+  }
+  *src = head;
+}
+
+static inline bool is_a_number(double d) {
   return d != NAN && d != INFINITY && d != -INFINITY && d != HUGE_VAL;
 }
 
@@ -18,6 +28,27 @@ static parse_result_t check_bounds_u16(double value, uint16_t *result) {
   } else {
     return PARSE_SCALAR_OOB;
   }
+}
+
+// Check if `candidate` starts with `literal` and is followed exclusively by
+// whitespace (if anything).
+static inline int strautoncasecmp(const char *const literal,
+                                  const char *candidate) {
+  size_t len = strlen(literal);
+  int equals = strncasecmp(literal, candidate, len);
+
+  if (equals == 0) {
+    const char *suffix = candidate + len;
+    gobble_whitespace((char **)&suffix);
+
+    if (suffix[0] == '\0') {
+      return equals;
+    } else {
+      return -1;
+    }
+  }
+
+  return equals;
 }
 
 parse_result_t parse_time(char *src, uint16_t *result) {
@@ -33,9 +64,7 @@ parse_result_t parse_time(char *src, uint16_t *result) {
   }
 
   src = end;
-  while (isspace(src[0])) {
-    ++src;
-  }
+  gobble_whitespace(&src);
 
   // Allow unitless zero
   if (src[0] == '\0') {
@@ -47,15 +76,15 @@ parse_result_t parse_time(char *src, uint16_t *result) {
     }
   }
 
-  if (strcasecmp("ms", src) == 0) {
+  if (strautoncasecmp("ms", src) == 0) {
     return check_bounds_u16(scalar, result);
   }
 
-  if (strcasecmp("s", src) == 0) {
+  if (strautoncasecmp("s", src) == 0) {
     return check_bounds_u16(scalar * 1000, result);
   }
 
-  if (strcasecmp("min", src) == 0) {
+  if (strautoncasecmp("min", src) == 0) {
     return check_bounds_u16(scalar * 1000 * 60, result);
   }
 
@@ -63,30 +92,28 @@ parse_result_t parse_time(char *src, uint16_t *result) {
 }
 
 parse_result_t parse_direction(char *src, uint16_t *result) {
-  while (isspace(src[0])) {
-    ++src;
-  }
+  gobble_whitespace(&src);
 
   if (isdigit(src[0])) {
     goto parse_digit;
   }
 
-  if (strcasecmp("up", src) == 0) {
+  if (strautoncasecmp("up", src) == 0) {
     *result = 0x8000;
     return PARSE_OK;
   }
 
-  if (strcasecmp("down", src) == 0) {
+  if (strautoncasecmp("down", src) == 0) {
     *result = 0x0000;
     return PARSE_OK;
   }
 
-  if (strcasecmp("left", src) == 0) {
+  if (strautoncasecmp("left", src) == 0) {
     *result = 0x4000;
     return PARSE_OK;
   }
 
-  if (strcasecmp("right", src) == 0) {
+  if (strautoncasecmp("right", src) == 0) {
     *result = 0xC000;
     return PARSE_OK;
   }
@@ -106,9 +133,7 @@ parse_digit:
   }
 
   src = end;
-  while (isspace(src[0])) {
-    ++src;
-  }
+  gobble_whitespace(&src);
 
   // Allow unitless zero
   if (src[0] == '\0') {
@@ -120,13 +145,13 @@ parse_digit:
     }
   }
 
-  if (strcasecmp("deg", src) == 0) {
+  if (strautoncasecmp("deg", src) == 0) {
     scalar = fmod(scalar, 360.0);
     *result = (uint16_t)((-(scalar + 90) / 360.0) * 0xFFFF);
     return PARSE_OK;
   }
 
-  if (strcasecmp("rad", src) == 0) {
+  if (strautoncasecmp("rad", src) == 0) {
     scalar = fmod(scalar, 2 * M_PI);
     *result = (uint16_t)((-(scalar + M_PI_2) / (2.0 * M_PI)) * 0xFFFF);
     return PARSE_OK;
@@ -160,11 +185,14 @@ parse_result_t parse_relative(char *src, uint32_t max, int64_t *result) {
   }
 
   src = end;
-  while (isspace(src[0])) {
-    ++src;
+  gobble_whitespace(&src);
+
+  if (src[0] == '\0') {
+    // Unitless
+    return check_bounds(numerator * max, min, max, result);
   }
 
-  if (strcasecmp("%", src) == 0) {
+  if (strautoncasecmp("%", src) == 0) {
     return check_bounds((numerator / 100) * max, min, max, result);
   }
 
@@ -182,5 +210,16 @@ parse_result_t parse_relative(char *src, uint32_t max, int64_t *result) {
     return check_bounds((numerator / denominator) * max, min, max, result);
   }
 
-  return check_bounds(numerator * max, min, max, result);
+  return PARSE_INVALID_UNIT;
 }
+
+#define X(Arg)                                                                 \
+  case Arg:                                                                    \
+    return #Arg;
+
+char *parse_result_get_name(parse_result_t result) {
+  switch (result) { X_PARSE_RESULT }
+  return "INVALID";
+}
+
+#undef X
